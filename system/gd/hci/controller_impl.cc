@@ -16,6 +16,7 @@
 
 #include "hci/controller_impl.h"
 
+#include <android-base/strings.h>
 #include <android_bluetooth_sysprop.h>
 #include <bluetooth/log.h>
 #include <bluetooth/metrics/os_metrics.h>
@@ -44,6 +45,8 @@ constexpr bool kDefaultRpaOffload = false;
 static const std::string kPropertyVendorCapabilitiesEnabled =
         "bluetooth.core.le.vendor_capabilities.enabled";
 static const std::string kPropertyRpaOffload = "bluetooth.core.le.rpa_offload";
+static const char kPropertyDisabledCommands[] =
+        "bluetooth.hci.disabled_commands";
 
 using os::Handler;
 
@@ -349,6 +352,15 @@ struct ControllerImpl::impl {
     if (com_android_bluetooth_flags_check_set_event_mask_p2_support_before_writing()) {
       if (is_supported(OpCode::SET_EVENT_MASK_PAGE_2)) {
         set_event_mask_page_2(kDefaultEventMaskPage2);
+      }
+    }
+
+    if (auto disabledCommands = os::GetSystemProperty(kPropertyDisabledCommands)) {
+      for (const auto& command : android::base::Split(*disabledCommands, ",")) {
+        uint16_t index = std::stoi(command);
+        uint16_t byte_index = index / 10;
+        uint16_t bit_index = index % 10;
+        local_supported_commands_[byte_index] &= ~(1 << bit_index);
       }
     }
   }
